@@ -46,15 +46,11 @@ a 404 means a wrong file key or no access for the token owner.
 
 ## Rate limits
 
-> **Note for Starter plan:** the plugin works on every plan, but Starter has the tightest API limits,
-> so the plugin is throttled to stay within them. Paid plans may be faster, but the plugin uses the same pace everywhere.
+> **Starter plan:** the plugin works on every plan, but Starter has the tightest API limits, so the plugin uses the same slow pace everywhere.
 
-- Comments endpoints are limited to about **5 requests per minute** on Starter, so the plugin sends
-  **one request every 12 seconds**. 100 comments take about 20 minutes. Keep the plugin open.
-- The plugin only calls `GET`/`POST /v1/files/:key/comments`. It never calls the file, nodes or images
-  endpoints, which allow only ~20 requests per *month* on Starter.
-- On HTTP 429 it waits `Retry-After` and retries, showing the plan tier and limit type if the browser exposes them.
-  If Retry-After is over 5 minutes, it stops and lists the remaining comments as **not yet mirrored**.
+- It sends **one request every 12 seconds** (Starter allows about 5 per minute). 100 comments take about 20 minutes, so keep the plugin open.
+- It only uses the comments endpoints, never the file, nodes or images endpoints.
+- If Figma rate limits it (HTTP 429), it waits and retries. If the wait is over 5 minutes, it stops and lists the rest as **not yet mirrored**.
   Run it again later: comments already in the target are skipped, so it resumes where it stopped.
 
 ## How comments are matched
