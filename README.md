@@ -11,9 +11,6 @@
 
 ---
 
-<img width="469" height="751" alt="Screenshot_15186" src="https://github.com/user-attachments/assets/4f1d6ee8-72aa-4f53-9929-5041a7aa367d" />
-
-
 ## Install (Figma desktop app)
 
 1. Open the **Figma desktop app**.
@@ -35,6 +32,10 @@ No other scope is needed. A 403 means a missing scope or no access to the file;
 a 404 means a wrong file key or no access for the token owner.
 
 ## Usage
+
+<p align="center">
+  <img width="360" alt="Comment Mirror plugin window" src="https://github.com/user-attachments/assets/4f1d6ee8-72aa-4f53-9929-5041a7aa367d">
+</p>
 
 1. Paste the token (*Remember token* stores it in `figma.clientStorage`; *Forget token* deletes it).
 2. Paste the **source** file URL (`figma.com/design/KEY/...` or `/file/KEY/...`).
