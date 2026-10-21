@@ -11,6 +11,9 @@
 
 ---
 
+<img width="469" height="751" alt="Screenshot_15186" src="https://github.com/user-attachments/assets/4f1d6ee8-72aa-4f53-9929-5041a7aa367d" />
+
+
 ## Install (Figma desktop app)
 
 1. Open the **Figma desktop app**.
