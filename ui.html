@@ -1,0 +1,648 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Comment Mirror</title>
+<style>
+  :root {
+    --bg: var(--figma-color-bg, #fff);
+    --fg: var(--figma-color-text, #222);
+    --muted: var(--figma-color-text-secondary, #777);
+    --border: var(--figma-color-border, #ddd);
+    --accent: var(--figma-color-bg-brand, #0d99ff);
+    --danger: var(--figma-color-text-danger, #e03131);
+    --ok: var(--figma-color-text-success, #2b8a3e);
+    --warn: var(--figma-color-text-warning, #c77700);
+    --surface: var(--figma-color-bg-secondary, #f5f5f5);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 12px/1.4 Inter, system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+  header { padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px; }
+  main { padding: 12px 16px 24px; }
+  label.field { display: block; margin-bottom: 10px; }
+  label.field > span { display: block; margin-bottom: 3px; color: var(--muted); }
+  input[type=text], input[type=password] { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--fg); font: inherit; }
+  .check { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  .row.spread { justify-content: space-between; margin-top: 0; }
+  fieldset { border: 1px solid var(--border); border-radius: 4px; margin: 12px 0; padding: 6px 10px 8px; }
+  legend { color: var(--muted); padding: 0 4px; }
+  button { font: inherit; padding: 6px 12px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.link { border: none; background: none; color: var(--muted); padding: 0; text-decoration: underline; }
+  button:disabled { opacity: .5; cursor: default; }
+  .hint { color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .box { padding: 8px 10px; background: var(--surface); border-radius: 4px; margin-top: 12px; }
+  #plan { display: none; }
+  #progress { display: none; margin-top: 14px; }
+  #bar { height: 6px; background: var(--surface); border-radius: 3px; overflow: hidden; }
+  #bar > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  #cur, #status, #eta { margin-top: 4px; color: var(--muted); }
+  #cur { color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #rl { display: none; margin-top: 8px; padding: 6px 10px; border: 1px solid var(--warn); border-radius: 4px; color: var(--warn); white-space: pre-wrap; }
+  #error { display: none; margin-top: 12px; padding: 8px 10px; border: 1px solid var(--danger); border-radius: 4px; color: var(--danger); white-space: pre-wrap; }
+  #report { display: none; margin-top: 16px; }
+  .counts { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; }
+  .counts b { text-align: right; }
+  h3 { margin: 16px 0 6px; font-size: 12px; }
+  .item { padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .item.reply { margin-left: 16px; }
+  .item .badge { display: inline-block; font-size: 10px; text-transform: uppercase; font-weight: 600; margin-right: 6px; }
+  .item .msg { white-space: pre-wrap; word-break: break-word; }
+  .item .detail { color: var(--muted); font-size: 11px; }
+  .g-ok { color: var(--ok); }
+  .g-skip { color: var(--muted); }
+  .g-bad { color: var(--danger); }
+  .g-wait { color: var(--warn); }
+  .orphan { border: 1px solid var(--danger); border-radius: 4px; padding: 6px 8px; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<header>Comment Mirror</header>
+<main>
+  <label class="field">
+    <span>Personal access token</span>
+    <input type="password" id="token" autocomplete="off" spellcheck="false">
+  </label>
+  <div class="row spread">
+    <label class="check"><input type="checkbox" id="remember"> Remember token</label>
+    <button class="link" id="forget" type="button">Forget token</button>
+  </div>
+
+  <label class="field" style="margin-top:12px">
+    <span>Source file URL (the old duplicate)</span>
+    <input type="text" id="source" placeholder="https://www.figma.com/design/KEY/Name" spellcheck="false">
+  </label>
+
+  <!-- Only shown when figma.fileKey is unavailable -->
+  <label class="field" id="targetWrap" style="display:none">
+    <span>Target file URL (this file)</span>
+    <input type="text" id="target" placeholder="https://www.figma.com/design/KEY/Name" spellcheck="false">
+    <div class="hint">The plugin could not detect this file's key automatically.</div>
+  </label>
+  <div class="hint" id="targetKnown"></div>
+
+  <fieldset>
+    <legend>Options</legend>
+    <label class="check"><input type="checkbox" id="skipResolved" checked> Skip resolved comments</label>
+    <label class="check"><input type="checkbox" id="includeReplies" checked> Include replies</label>
+    <label class="check"><input type="checkbox" id="dryRun"> Dry run (fetch and preview only, post nothing)</label>
+  </fieldset>
+
+  <div class="row">
+    <button class="primary" id="go" type="button">Mirror comments</button>
+    <button id="stop" type="button" style="display:none">Stop</button>
+  </div>
+
+  <!-- Plan shown before anything is posted -->
+  <div class="box" id="plan">
+    <div id="planText"></div>
+    <div class="row">
+      <button class="primary" id="start" type="button">Start</button>
+      <button id="discard" type="button">Cancel</button>
+    </div>
+  </div>
+
+  <div id="progress">
+    <div id="bar"><div></div></div>
+    <div id="cur"></div>
+    <div id="eta"></div>
+    <div id="status"></div>
+  </div>
+  <div id="rl"></div>
+  <div id="error"></div>
+
+  <div id="report">
+    <div class="box" style="margin-top:0"><div class="counts" id="counts"></div></div>
+    <div id="orphanSection">
+      <h3>Orphaned comments (re-add by hand)</h3>
+      <div id="orphans"></div>
+      <button id="copyOrphans" type="button">Copy all orphans</button>
+    </div>
+    <h3>Details</h3>
+    <div id="items"></div>
+  </div>
+</main>
+
+<script>
+// ---------------------------------------------------------------------------
+// Constants & tiny helpers
+// ---------------------------------------------------------------------------
+const API = 'https://api.figma.com/v1';
+
+// Starter plan: comments endpoints allow 5 requests/minute -> 12 s apart.
+// This plugin ONLY calls GET/POST /files/:key/comments (Tier 2). It must never
+// call GET /files/:key, /nodes or /images (Tier 1: ~20 requests per MONTH).
+const MIN_GAP_MS = 12000;
+const MAX_RETRY_WAIT_S = 300;   // longer Retry-After than this -> stop the run
+const MAX_429_RETRIES = 3;      // per request
+
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Build a DOM element; text goes through textContent so comment text can't inject HTML.
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+function fmtDuration(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return m ? m + ' min ' + s + ' s' : s + ' s';
+}
+
+// kind: 'network' | 'http' (per-comment failures)
+//       'stop' | 'fatal' | 'longwait' | 'ratelimit' (abort the whole run)
+class ApiError extends Error {
+  constructor(message, kind) { super(message); this.kind = kind; }
+}
+const isAbort = (e) => e instanceof ApiError && ['stop', 'fatal', 'longwait', 'ratelimit'].includes(e.kind);
+
+let stopRequested = false;
+let lastRequestAt = 0; // when the last request was sent (for the 12 s spacing)
+
+// ---------------------------------------------------------------------------
+// Messaging with code.js
+// ---------------------------------------------------------------------------
+const pending = new Map();
+let nextReq = 1;
+
+function send(msg) { parent.postMessage({ pluginMessage: msg }, '*'); }
+
+function rpc(msg) {
+  return new Promise((resolve, reject) => {
+    const reqId = nextReq++;
+    pending.set(reqId, { resolve, reject });
+    send(Object.assign({ reqId }, msg));
+  });
+}
+
+let knownTargetKey = null;
+
+window.onmessage = (e) => {
+  const msg = e.data && e.data.pluginMessage;
+  if (!msg) return;
+  if (msg.type === 'init') {
+    if (msg.token) { $('token').value = msg.token; $('remember').checked = true; }
+    knownTargetKey = msg.fileKey;
+    if (knownTargetKey) $('targetKnown').textContent = 'Target: this file (' + knownTargetKey + ')';
+    else $('targetWrap').style.display = 'block';
+  } else if (msg.type === 'reply' && pending.has(msg.reqId)) {
+    const p = pending.get(msg.reqId);
+    pending.delete(msg.reqId);
+    msg.error ? p.reject(new Error(msg.error)) : p.resolve(msg);
+  }
+};
+
+$('forget').onclick = () => {
+  send({ type: 'forget-token' });
+  $('token').value = '';
+  $('remember').checked = false;
+};
+
+// ---------------------------------------------------------------------------
+// URL parsing
+// ---------------------------------------------------------------------------
+// figma.com/design/:key/..., /file/:key/..., branch URLs (-> branch key) or a bare key.
+function parseFileKey(input) {
+  const s = (input || '').trim();
+  if (!s) return null;
+  const branch = s.match(/figma\.com\/(?:design|file)\/[A-Za-z0-9]+\/branch\/([A-Za-z0-9]+)/);
+  if (branch) return branch[1];
+  const m = s.match(/figma\.com\/(?:design|file)\/([A-Za-z0-9]+)/);
+  if (m) return m[1];
+  if (/^[A-Za-z0-9]{15,40}$/.test(s)) return s;
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Throttled Figma REST API wrapper
+// ---------------------------------------------------------------------------
+function setStatus(t) { $('status').textContent = t; }
+
+// Wait until MIN_GAP_MS has passed since the previous request. Stop-aware.
+async function waitForSlot(label) {
+  for (;;) {
+    if (stopRequested) throw new ApiError('Stopped by you.', 'stop');
+    const wait = lastRequestAt + MIN_GAP_MS - Date.now();
+    if (wait <= 0) return;
+    setStatus(label + ' - next request in ' + Math.ceil(wait / 1000) + ' s');
+    await sleep(Math.min(wait, 250));
+  }
+}
+
+// One request, strictly sequential. The token only goes in the X-Figma-Token
+// header (never in a URL) and is never logged.
+async function figmaApi(token, method, path, body, label) {
+  for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
+    await waitForSlot(label);
+    lastRequestAt = Date.now();
+
+    let res;
+    try {
+      res = await fetch(API + path, {
+        method,
+        headers: Object.assign({ 'X-Figma-Token': token }, body ? { 'Content-Type': 'application/json' } : {}),
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch (e) {
+      throw new ApiError('Network error: could not reach api.figma.com', 'network');
+    }
+
+    if (res.status === 429) {
+      // Headers can be hidden by CORS; show "unknown" if so.
+      const retryAfter = parseInt(res.headers.get('Retry-After'), 10);
+      const tier = res.headers.get('X-Figma-Plan-Tier') || 'unknown';
+      const type = res.headers.get('X-Figma-Rate-Limit-Type') || 'unknown';
+      const wait = isNaN(retryAfter) ? 60 : retryAfter; // 5/min window -> 60 s if unreadable
+      if (wait > MAX_RETRY_WAIT_S) {
+        throw new ApiError('Figma asked to wait ' + fmtDuration(wait) + ' (plan tier: ' + tier + ', limit type: ' + type + ').\n' +
+          'That is longer than 5 minutes, so the run was stopped. Run the plugin again later; comments already mirrored will be skipped.', 'longwait');
+      }
+      const info = $('rl');
+      info.style.display = 'block';
+      for (let left = wait; left > 0; left--) {
+        if (stopRequested) throw new ApiError('Stopped by you.', 'stop');
+        info.textContent = 'Rate limited (HTTP 429)\nRetry-After: ' + (isNaN(retryAfter) ? 'unreadable, using 60' : retryAfter) +
+          ' s · Plan tier: ' + tier + ' · Limit type: ' + type + '\nRetrying in ' + left + ' s...';
+        await sleep(1000);
+      }
+      info.style.display = 'none';
+      continue;
+    }
+
+    if (res.status === 403) {
+      throw new ApiError('HTTP 403 Forbidden: the token is missing the comment read/write scopes (file_comments:read, file_comments:write), ' +
+        'or it does not have access to this file.', 'fatal');
+    }
+    if (res.status === 404) {
+      throw new ApiError('HTTP 404 Not Found: the file key is wrong, or the token owner cannot access the file.', 'fatal');
+    }
+    if (!res.ok) {
+      let detail = '';
+      try { const j = await res.json(); detail = j.err || j.message || ''; } catch (e) {}
+      throw new ApiError('HTTP ' + res.status + (detail ? ': ' + detail : ''), 'http');
+    }
+    return res.json();
+  }
+  throw new ApiError('Still rate limited after ' + MAX_429_RETRIES + ' retries. Stopped; run again later.', 'ratelimit');
+}
+
+// ---------------------------------------------------------------------------
+// Comment helpers
+// ---------------------------------------------------------------------------
+const r = (n) => Math.round(Number(n) || 0);
+
+// Position part of the "already exists" key: node_id + node_offset, or x,y.
+function posKey(meta) {
+  if (meta && meta.node_id) {
+    const o = meta.node_offset || {};
+    return 'n:' + meta.node_id + ':' + r(o.x) + ',' + r(o.y);
+  }
+  return 'p:' + r(meta && meta.x) + ',' + r(meta && meta.y);
+}
+const commentKey = (message, meta) => message.trim() + '\u0000' + posKey(meta);
+const byCreated = (a, b) => new Date(a.created_at) - new Date(b.created_at);
+
+// ---------------------------------------------------------------------------
+// Plan: reads both files' comments and decides what happens to each comment.
+// ---------------------------------------------------------------------------
+// entry = { src, meta, status, detail, targetId, replies: [{ src, status, detail }] }
+// parent status: post | existing | resolved | orphaned | failed | mirrored | would | notyet
+// reply status:  post | existing | skip | mirrored | would | failed | notyet
+let plan = null;
+
+async function buildPlan(token, sourceKey, targetKey, opts) {
+  // 1. Source comments (1 request)
+  const src = (await figmaApi(token, 'GET', '/files/' + sourceKey + '/comments', null, 'Reading source comments')).comments || [];
+
+  // 2. Top-level vs replies, chronological
+  const topLevel = src.filter((c) => !c.parent_id).sort(byCreated);
+  const repliesByParent = new Map();
+  for (const c of src.filter((c) => c.parent_id).sort(byCreated)) {
+    if (!repliesByParent.has(c.parent_id)) repliesByParent.set(c.parent_id, []);
+    repliesByParent.get(c.parent_id).push(c);
+  }
+
+  // 3. Existing target comments, fetched once (1 request)
+  const tgt = (await figmaApi(token, 'GET', '/files/' + targetKey + '/comments', null, 'Reading target comments')).comments || [];
+  const existingTop = new Map();      // commentKey -> target comment id
+  const existingReplies = new Map();  // target parent id -> Set of reply messages
+  for (const c of tgt) {
+    if (!c.parent_id) existingTop.set(commentKey(c.message, c.client_meta), c.id);
+    else {
+      if (!existingReplies.has(c.parent_id)) existingReplies.set(c.parent_id, new Set());
+      existingReplies.get(c.parent_id).add(c.message.trim());
+    }
+  }
+
+  // 4. Which referenced nodes exist in this file? (local, no API request)
+  setStatus('Checking nodes in this file...');
+  const wanted = topLevel.filter((c) => !(opts.skipResolved && c.resolved_at));
+  const nodeIds = [...new Set(wanted.map((c) => c.client_meta && c.client_meta.node_id).filter(Boolean))];
+  const existingNodes = new Set(nodeIds.length ? (await rpc({ type: 'check-nodes', ids: nodeIds })).existing : []);
+
+  // 5. Decide a status for every comment
+  const entries = [];
+  for (const c of topLevel) {
+    const meta = c.client_meta;
+    const e = { src: c, meta, status: '', detail: '', targetId: null, replies: [] };
+    const srcReplies = opts.includeReplies ? repliesByParent.get(c.id) || [] : [];
+
+    if (opts.skipResolved && c.resolved_at) e.status = 'resolved';
+    else if (!meta) { e.status = 'failed'; e.detail = 'Comment has no position (client_meta).'; }
+    else if (meta.node_id && !existingNodes.has(meta.node_id)) e.status = 'orphaned';
+    else {
+      const existingId = existingTop.get(commentKey(c.message, meta));
+      if (existingId) { e.status = 'existing'; e.targetId = existingId; }
+      else e.status = 'post';
+    }
+
+    // Replies only matter if the parent is (or will be) in the target file.
+    const parentOk = e.status === 'post' || e.status === 'existing';
+    const seen = e.status === 'existing' ? existingReplies.get(e.targetId) || new Set() : new Set();
+    for (const rep of srcReplies) {
+      let st = 'skip';
+      if (parentOk) st = seen.has(rep.message.trim()) ? 'existing' : 'post';
+      e.replies.push({ src: rep, status: st, detail: '' });
+    }
+    entries.push(e);
+  }
+
+  const posts = entries.reduce((n, e) => n + (e.status === 'post' ? 1 : 0) + e.replies.filter((x) => x.status === 'post').length, 0);
+  return { entries, posts, sourceKey, targetKey, opts, abortMessage: '' };
+}
+
+// ---------------------------------------------------------------------------
+// Execute: POST everything marked 'post', one at a time.
+// ---------------------------------------------------------------------------
+let postsDone = 0;
+
+function showProgress(current) {
+  const total = plan.posts;
+  $('bar').firstElementChild.style.width = (total ? Math.round((postsDone / total) * 100) : 100) + '%';
+  $('cur').textContent = current ? current : '';
+  $('eta').textContent = 'Request ' + Math.min(postsDone + 1, total) + ' of ' + total +
+    ' · about ' + fmtDuration((total - postsDone) * MIN_GAP_MS / 1000) + ' remaining';
+}
+
+const preview = (t) => { t = t.replace(/\s+/g, ' ').trim(); return t.length > 70 ? t.slice(0, 70) + '…' : t; };
+
+async function execute(token) {
+  const { entries, targetKey } = plan;
+  postsDone = 0;
+  try {
+    for (const e of entries) {
+      if (e.status === 'post') {
+        showProgress('Comment: ' + preview(e.src.message));
+        try {
+          const created = await figmaApi(token, 'POST', '/files/' + targetKey + '/comments',
+            { message: e.src.message, client_meta: e.meta }, 'Posting comment');
+          e.status = 'mirrored';
+          e.targetId = created.id; // mapping oldId -> newId lives on the entry
+        } catch (err) {
+          if (isAbort(err)) throw err;
+          e.status = 'failed'; e.detail = err.message; // per-comment failure; its replies stay 'post' -> "not yet"
+        }
+        postsDone++;
+      }
+      if (e.status !== 'mirrored' && e.status !== 'existing') continue;
+
+      for (const rep of e.replies) {
+        if (rep.status !== 'post') continue;
+        showProgress('Reply: ' + preview(rep.src.message));
+        try {
+          await figmaApi(token, 'POST', '/files/' + targetKey + '/comments',
+            { message: rep.src.message, comment_id: e.targetId }, 'Posting reply');
+          rep.status = 'mirrored';
+        } catch (err) {
+          if (isAbort(err)) throw err;
+          rep.status = 'failed'; rep.detail = err.message;
+        }
+        postsDone++;
+      }
+    }
+  } catch (err) {
+    if (!isAbort(err)) throw err;
+    plan.abortMessage = err.message;
+  }
+}
+
+// Anything still 'post' was never sent: "would" in a dry run, "not yet mirrored" otherwise.
+function finalize(dry) {
+  const rest = dry ? 'would' : 'notyet';
+  for (const e of plan.entries) {
+    if (e.status === 'post') e.status = rest;
+    for (const rep of e.replies) if (rep.status === 'post') rep.status = rest;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// UI flow
+// ---------------------------------------------------------------------------
+function setBusy(busy, stoppable) {
+  for (const id of ['token', 'source', 'target', 'skipResolved', 'includeReplies', 'dryRun', 'remember']) $(id).disabled = busy;
+  $('go').disabled = busy;
+  $('stop').style.display = stoppable ? '' : 'none';
+}
+function showError(t) { const e = $('error'); e.textContent = t; e.style.display = t ? 'block' : 'none'; }
+
+$('stop').onclick = () => { stopRequested = true; $('stop').disabled = true; setStatus('Stopping after the current request...'); };
+$('discard').onclick = () => { plan = null; $('plan').style.display = 'none'; };
+
+let session = null; // { token, opts } kept between "Mirror comments" and "Start"
+
+$('go').onclick = async () => {
+  const token = $('token').value.trim();
+  const opts = { skipResolved: $('skipResolved').checked, includeReplies: $('includeReplies').checked, dryRun: $('dryRun').checked };
+
+  showError('');
+  $('report').style.display = 'none';
+  $('plan').style.display = 'none';
+  $('rl').style.display = 'none';
+  if (!token) return showError('Enter your personal access token.');
+  const sourceKey = parseFileKey($('source').value);
+  if (!sourceKey) return showError('Could not read a file key from the source URL.');
+  const targetKey = knownTargetKey || parseFileKey($('target').value);
+  if (!targetKey) return showError('Enter the target file URL.');
+  if (targetKey === sourceKey) return showError('Source and target are the same file.');
+
+  send($('remember').checked ? { type: 'save-token', token } : { type: 'forget-token' });
+
+  stopRequested = false;
+  $('stop').disabled = false;
+  setBusy(true, true);
+  $('progress').style.display = 'block';
+  $('bar').firstElementChild.style.width = '0';
+  $('cur').textContent = ''; $('eta').textContent = '';
+
+  try {
+    plan = await buildPlan(token, sourceKey, targetKey, opts);
+  } catch (e) {
+    plan = null;
+    showError(e.message);
+    setBusy(false, false);
+    $('progress').style.display = 'none';
+    return;
+  }
+  session = { token, opts };
+  setBusy(false, false);
+  $('progress').style.display = 'none';
+
+  if (opts.dryRun) { finalize(true); renderReport(true); return; } // preview only
+  showPlan();
+};
+
+function showPlan() {
+  const c = computeCounts(plan.entries);
+  const box = $('planText');
+  box.textContent = '';
+  box.appendChild(el('div', '', 'Planned POST requests: ' + plan.posts));
+  box.appendChild(el('div', '', 'Estimated time: ' + fmtDuration(plan.posts * MIN_GAP_MS / 1000) +
+    ' (one request every ' + MIN_GAP_MS / 1000 + ' s; Starter plan allows 5 per minute)'));
+  box.appendChild(el('div', 'hint', 'Skipping: ' + c.resolved + ' resolved, ' + c.existing + ' already exist, ' + c.orphaned + ' orphaned.'));
+  $('start').disabled = plan.posts === 0;
+  $('plan').style.display = 'block';
+  if (plan.posts === 0) { finalize(false); renderReport(false); }
+}
+
+$('start').onclick = async () => {
+  $('plan').style.display = 'none';
+  stopRequested = false;
+  $('stop').disabled = false;
+  setBusy(true, true);
+  $('progress').style.display = 'block';
+  try {
+    await execute(session.token);
+  } catch (e) {
+    showError(e.message); // unexpected error; the report below still shows what happened
+  }
+  finalize(false);
+  setBusy(false, false);
+  $('progress').style.display = 'none';
+  renderReport(false);
+};
+
+// ---------------------------------------------------------------------------
+// Report
+// ---------------------------------------------------------------------------
+function computeCounts(entries) {
+  const c = { mirrored: 0, repliesMirrored: 0, resolved: 0, existing: 0, orphaned: 0, notYet: 0, failed: 0 };
+  for (const e of entries) {
+    if (e.status === 'mirrored' || e.status === 'would') c.mirrored++;
+    else if (e.status === 'existing') c.existing++;
+    else if (e.status === 'resolved') c.resolved++;
+    else if (e.status === 'orphaned') c.orphaned++;
+    else if (e.status === 'failed') c.failed++;
+    else if (e.status === 'notyet') c.notYet++;
+    for (const rep of e.replies) {
+      if (rep.status === 'mirrored' || rep.status === 'would') c.repliesMirrored++;
+      else if (rep.status === 'existing') c.existing++;
+      else if (rep.status === 'failed') c.failed++;
+      else if (rep.status === 'notyet') c.notYet++;
+    }
+  }
+  return c;
+}
+
+// label + colour group for each status
+const LABELS = {
+  mirrored: ['mirrored', 'ok'], would: ['would mirror', 'ok'], existing: ['skipped (already exists)', 'skip'],
+  resolved: ['skipped (resolved)', 'skip'], orphaned: ['orphaned', 'bad'], failed: ['failed', 'bad'], notyet: ['not yet mirrored', 'wait'],
+};
+
+function orphansAsText(entries) {
+  // text only, one comment per line, replies indented
+  const line = (t) => t.replace(/\s*\n\s*/g, ' ');
+  const out = [];
+  for (const e of entries) {
+    if (e.status !== 'orphaned') continue;
+    out.push(line(e.src.message));
+    for (const rep of e.replies) out.push('  ' + line(rep.src.message));
+  }
+  return out.join('\n');
+}
+
+function renderReport(dry) {
+  const { entries, posts, abortMessage } = plan;
+  const c = computeCounts(entries);
+  $('report').style.display = 'block';
+  if (abortMessage) showError(abortMessage);
+
+  const rows = [
+    [dry ? 'Would mirror' : 'Mirrored', c.mirrored],
+    [dry ? 'Replies that would be mirrored' : 'Replies mirrored', c.repliesMirrored],
+    ['Skipped (resolved)', c.resolved],
+    ['Skipped (already exists)', c.existing],
+    ['Orphaned', c.orphaned],
+    ['Not yet mirrored', c.notYet],
+    ['Failed', c.failed],
+  ];
+  const box = $('counts');
+  box.textContent = '';
+  if (dry) {
+    const d = el('div', '', 'DRY RUN - nothing was posted. A real run needs ' + posts + ' POST requests (about ' + fmtDuration(posts * MIN_GAP_MS / 1000) + ').');
+    d.style.gridColumn = '1 / -1';
+    box.appendChild(d);
+  }
+  for (const [label, n] of rows) { box.appendChild(el('span', '', label)); box.appendChild(el('b', '', String(n))); }
+
+  // Orphans with full text
+  const orphans = entries.filter((e) => e.status === 'orphaned');
+  $('orphanSection').style.display = orphans.length ? 'block' : 'none';
+  const ob = $('orphans');
+  ob.textContent = '';
+  for (const e of orphans) {
+    const d = el('div', 'orphan');
+    d.appendChild(el('div', 'msg', e.src.message));
+    for (const rep of e.replies) d.appendChild(el('div', 'detail', '↳ ' + rep.src.message));
+    ob.appendChild(d);
+  }
+  $('copyOrphans').onclick = () => copyText(orphansAsText(entries), $('copyOrphans'));
+
+  // Per-comment details
+  const list = $('items');
+  list.textContent = '';
+  const addRow = (it, text, isReply) => {
+    if (it.status === 'skip') return;
+    if (isReply && it.status === 'orphaned') return;
+    const [label, group] = LABELS[it.status] || [it.status, 'skip'];
+    const d = el('div', 'item' + (isReply ? ' reply' : ''));
+    const line = el('div');
+    line.appendChild(el('span', 'badge g-' + group, (isReply ? 'reply ' : '') + label));
+    line.appendChild(el('span', 'msg', text));
+    d.appendChild(line);
+    if (it.detail) d.appendChild(el('div', 'detail', it.detail));
+    list.appendChild(d);
+  };
+  for (const e of entries) {
+    addRow(e, e.src.message, false);
+    // replies of resolved parents are not listed; orphan replies are in the orphan block
+    if (e.status !== 'resolved' && e.status !== 'orphaned') for (const rep of e.replies) addRow(rep, rep.src.message, true);
+  }
+}
+
+// navigator.clipboard is often blocked in plugin iframes; fall back to execCommand.
+async function copyText(text, button) {
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {}
+  if (!ok) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+  }
+  const old = button.textContent;
+  button.textContent = ok ? 'Copied!' : 'Copy failed';
+  setTimeout(() => { button.textContent = old; }, 1500);
+}
+
+send({ type: 'init' });
+</script>
+</body>
+</html>
