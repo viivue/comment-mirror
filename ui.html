@@ -382,7 +382,7 @@ async function buildPlan(token, sourceKey, targetKey, opts) {
   }
 
   const posts = entries.reduce((n, e) => n + (e.status === 'post' ? 1 : 0) + e.replies.filter((x) => x.status === 'post').length, 0);
-  return { entries, posts, sourceKey, targetKey, opts, abortMessage: '' };
+  return { entries, posts, targetKey, abortMessage: '' };
 }
 
 // ---------------------------------------------------------------------------
@@ -462,7 +462,7 @@ function showError(t) { const e = $('error'); e.textContent = t; e.style.display
 $('stop').onclick = () => { stopRequested = true; $('stop').disabled = true; setStatus('Stopping after the current request...'); };
 $('discard').onclick = () => { plan = null; $('plan').style.display = 'none'; };
 
-let session = null; // { token, opts } kept between "Mirror comments" and "Start"
+let sessionToken = ''; // kept between "Mirror comments" and "Start"
 
 $('go').onclick = async () => {
   const token = $('token').value.trim();
@@ -497,7 +497,7 @@ $('go').onclick = async () => {
     $('progress').style.display = 'none';
     return;
   }
-  session = { token, opts };
+  sessionToken = token;
   setBusy(false, false);
   $('progress').style.display = 'none';
 
@@ -525,10 +525,11 @@ $('start').onclick = async () => {
   setBusy(true, true);
   $('progress').style.display = 'block';
   try {
-    await execute(session.token);
+    await execute(sessionToken);
   } catch (e) {
     showError(e.message); // unexpected error; the report below still shows what happened
   }
+  $('rl').style.display = 'none';
   finalize(false);
   setBusy(false, false);
   $('progress').style.display = 'none';
@@ -617,8 +618,7 @@ function renderReport(dry) {
   list.textContent = '';
   const addRow = (it, text, isReply) => {
     if (it.status === 'skip') return;
-    if (isReply && it.status === 'orphaned') return;
-    const [label, group] = LABELS[it.status] || [it.status, 'skip'];
+    const [label, group] = LABELS[it.status];
     const d = el('div', 'item' + (isReply ? ' reply' : ''));
     const line = el('div');
     line.appendChild(el('span', 'badge g-' + group, (isReply ? 'reply ' : '') + label));
