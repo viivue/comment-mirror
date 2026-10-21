@@ -11,7 +11,7 @@
 
 ---
 
-## Install (Figma desktop app, Starter plan)
+## Install (Figma desktop app)
 
 1. Open the **Figma desktop app**.
 2. Open the *new* duplicate file (the one that should receive the comments).
@@ -40,9 +40,12 @@ a 404 means a wrong file key or no access for the token owner.
    number of POST requests and estimated time. Click **Start** to post. **Stop** finishes the current request and stops.
 4. **Dry run** fetches and previews everything without posting.
 
-## Rate limits (Starter plan)
+## Rate limits
 
-- Comments endpoints are limited to about **5 requests per minute**, so the plugin sends
+> **Note for Starter plan:** the plugin works on every plan, but Starter has the tightest API limits,
+> so the plugin is throttled to stay within them. Paid plans may be faster, but the plugin uses the same pace everywhere.
+
+- Comments endpoints are limited to about **5 requests per minute** on Starter, so the plugin sends
   **one request every 12 seconds**. 100 comments take about 20 minutes. Keep the plugin open.
 - The plugin only calls `GET`/`POST /v1/files/:key/comments`. It never calls the file, nodes or images
   endpoints, which allow only ~20 requests per *month* on Starter.
