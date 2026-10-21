@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Comment Mirror">
+  <!-- Background: brand yellow -->
+  <rect width="128" height="128" rx="28" fill="#F1C400"/>
+
+  <!-- Source comment: outlined, translucent (the "original") -->
+  <path d="M30 20 H68 Q80 20 80 32 V52 Q80 64 68 64 H44 L30 80 V64 Q18 64 18 52 V32 Q18 20 30 20 Z"
+        fill="none" stroke="#1A1A1A" stroke-opacity=".6" stroke-width="5" stroke-linejoin="round"/>
+
+  <!-- Mirrored comment: solid, tail on the opposite side -->
+  <path d="M60 48 H98 Q110 48 110 60 V80 Q110 92 98 92 V108 L82 92 H60 Q48 92 48 80 V60 Q48 48 60 48 Z"
+        fill="#1A1A1A" stroke="#1A1A1A" stroke-width="2" stroke-linejoin="round"/>
+
+  <!-- Typing dots -->
+  <circle cx="65" cy="70" r="4.5" fill="#F1C400"/>
+  <circle cx="79" cy="70" r="4.5" fill="#F1C400"/>
+  <circle cx="93" cy="70" r="4.5" fill="#F1C400"/>
+</svg>
