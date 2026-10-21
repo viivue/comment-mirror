@@ -1,10 +1,14 @@
-# Comment Mirror
+<h1 align="center">Comment Mirror</h1>
 
-Figma development plugin that copies comments (text + position) from an old
-duplicated file into the file the plugin is running in, as real Figma comments.
+<p align="center">
+  <img alt="Free" src="https://img.shields.io/badge/price-free-brightgreen">
+</p>
 
-The Plugin API cannot read or write comments, so the plugin UI calls the
-Figma REST API with your personal access token.
+<p align="center">
+  Copy your Figma comments, with the same text and position, from an old duplicate into the file you're working in.
+</p>
+
+---
 
 ## Install (Figma desktop app, Starter plan)
 
@@ -14,6 +18,8 @@ Figma REST API with your personal access token.
 4. Run it: **Plugins → Development → Comment Mirror**.
 
 ## Create the token
+
+The Plugin API can't read or write comments, so the plugin calls the Figma REST API with your personal access token.
 
 1. Figma → your avatar → **Settings** → **Security** → **Personal access tokens** → **Generate new token**.
 2. Choose an expiration and enable these scopes:
