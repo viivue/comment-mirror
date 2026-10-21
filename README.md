@@ -1,6 +1,7 @@
 <h1 align="center">Comment Mirror</h1>
 
 <p align="center">
+  <img alt="Figma plugin" src="https://img.shields.io/badge/Figma-plugin-F24E1E?logo=figma&logoColor=white">
   <img alt="Free" src="https://img.shields.io/badge/price-free-brightgreen">
 </p>
 
