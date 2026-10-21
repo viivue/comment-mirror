@@ -304,7 +304,16 @@ function posKey(meta) {
   }
   return 'p:' + r(meta && meta.x) + ',' + r(meta && meta.y);
 }
-const commentKey = (message, meta) => message.trim() + '\u0000' + posKey(meta);
+// Figma returns list items as "* item"; mirror them as "- item" so they stay valid list items.
+// Only line-leading "* " is touched (not *italic*, **bold** or a mid-line "*"), and fenced code is skipped.
+const normMsg = (m) => {
+  let inFence = false;
+  return m.split('\n').map((line) => {
+    if (/^\s*```/.test(line)) { inFence = !inFence; return line; }
+    return inFence ? line : line.replace(/^([ \t]*)\*[ \t]+/, '$1- ');
+  }).join('\n');
+};
+const commentKey = (message, meta) => normMsg(message).trim() + '\u0000' + posKey(meta);
 const byCreated = (a, b) => new Date(a.created_at) - new Date(b.created_at);
 
 // ---------------------------------------------------------------------------
@@ -335,7 +344,7 @@ async function buildPlan(token, sourceKey, targetKey, opts) {
     if (!c.parent_id) existingTop.set(commentKey(c.message, c.client_meta), c.id);
     else {
       if (!existingReplies.has(c.parent_id)) existingReplies.set(c.parent_id, new Set());
-      existingReplies.get(c.parent_id).add(c.message.trim());
+      existingReplies.get(c.parent_id).add(normMsg(c.message).trim());
     }
   }
 
@@ -366,7 +375,7 @@ async function buildPlan(token, sourceKey, targetKey, opts) {
     const seen = e.status === 'existing' ? existingReplies.get(e.targetId) || new Set() : new Set();
     for (const rep of srcReplies) {
       let st = 'skip';
-      if (parentOk) st = seen.has(rep.message.trim()) ? 'existing' : 'post';
+      if (parentOk) st = seen.has(normMsg(rep.message).trim()) ? 'existing' : 'post';
       e.replies.push({ src: rep, status: st, detail: '' });
     }
     entries.push(e);
@@ -400,7 +409,7 @@ async function execute(token) {
         showProgress('Comment: ' + preview(e.src.message));
         try {
           const created = await figmaApi(token, 'POST', '/files/' + targetKey + '/comments',
-            { message: e.src.message, client_meta: e.meta }, 'Posting comment');
+            { message: normMsg(e.src.message), client_meta: e.meta }, 'Posting comment');
           e.status = 'mirrored';
           e.targetId = created.id; // mapping oldId -> newId lives on the entry
         } catch (err) {
@@ -416,7 +425,7 @@ async function execute(token) {
         showProgress('Reply: ' + preview(rep.src.message));
         try {
           await figmaApi(token, 'POST', '/files/' + targetKey + '/comments',
-            { message: rep.src.message, comment_id: e.targetId }, 'Posting reply');
+            { message: normMsg(rep.src.message), comment_id: e.targetId }, 'Posting reply');
           rep.status = 'mirrored';
         } catch (err) {
           if (isAbort(err)) throw err;
